@@ -1,6 +1,6 @@
-Compiler = "C:\Program Files (x86)\MinGW64\mingw64\bin\g++.exe"
-Options = "-DUNICODE"
-ASIOpath = "R:\ASIO\asio-1.18.2\include"
+Compiler = "g++.exe"
+Options = "-DUNICODE -std=c++14"
+ASIOpath = "R:\asio-1.18.2\include"
 
 .PHONY: clear
 

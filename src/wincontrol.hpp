@@ -39,6 +39,11 @@ namespace win_control
 	void consoleInit();
 
 	void cls();
+
+	namespace input_record{
+		void keyHandler(int);
+		void getInput();
+	}
 }
 
 #endif

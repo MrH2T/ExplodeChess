@@ -32,4 +32,17 @@ namespace win_control
     void cls()
     {
     }
+    namespace input_record{
+        CONSOLE_SCREEN_BUFFER_INFO bInfo;
+        INPUT_RECORD ms_rec;
+        DWORD ms_res;
+        void getInput(){
+            ReadConsoleInput(hIn,&ms_rec,1,&ms_res);
+            if(ms_rec.EventType==KEY_EVENT){
+                if(ms_rec.Event.KeyEvent.bKeyDown){
+                    win_control::input_record::keyHandler(ms_rec.Event.KeyEvent.wVirtualKeyCode);
+                }
+            }
+        }
+    }
 }

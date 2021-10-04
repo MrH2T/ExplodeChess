@@ -46,17 +46,23 @@ namespace Game
         }
 
     }
-
     void gameAllInit()
     {
         onGameRunning = true;
         win_control::consoleInit();
     }
 }
+void ::win_control::input_record::keyHandler(int keyCode){
+    switch(keyCode){
+        
+    }
+}
+
 int main()
 {
     Game::gameAllInit();
     while (Game::onGameRunning)
     {
+        
     }
 }
