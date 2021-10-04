@@ -9,7 +9,7 @@ namespace Game
     volatile bool onGameRunning;
     asio::io_context io_context;
 
-    int playerCount=0;
+    int playerCount = 0;
 
     enum GameType
     {
@@ -20,6 +20,7 @@ namespace Game
     namespace References
     {
         const size_t MAX_CLIENT_COUNT = 10;
+        const int PORT = 14514;
     }
     namespace Network
     {
@@ -38,9 +39,11 @@ namespace Game
         void networkInit()
         {
         }
-        void clientStartup(asio::ip::tcp::endpoint endpoint, bool localHost = 0)
+        void clientStartup(std::string ipAddress, bool localHost = 0)
         {
-            soc = asio::ip::tcp::socket(io_context, endpoint);
+            asio::connect(
+                soc,
+                asio::ip::tcp::resolver(io_context).resolve(ipAddress, std::to_string(References::PORT)));
         }
         void serverStartup(int port)
         {
@@ -49,12 +52,51 @@ namespace Game
                 asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port));
             clientConnected = 0;
         }
-
+        void sendMessage(asio::ip::tcp::socket &soc, std::string msg)
+        {
+            asio::write(soc, asio::buffer(msg));
+        }
+        void sendToAll(std::string msg)
+        {
+            if (gType != INET_HOST)
+                return;
+            for (int i = 1; i <= clientConnected; i++)
+            {
+                sendMessage(clients[i].sock, msg);
+            }
+        }
     }
-    void gameAllInit()
+
+    void beGuest()
     {
-        onGameRunning = true;
-        win_control::consoleInit();
+        //not final version
+
+        gType = INET_GUEST;
+        std::cout<<"IP Address: ";
+        std::string ipAddress;
+        std::cin >> ipAddress;
+        std::cout<<"Your user name: ";
+        std::string username;
+        std::cin>>username;
+        try
+        {
+            Network::clientStartup(ipAddress);
+            Network::sendMessage(Network::soc,username);
+        }
+        catch (std::exception &e)
+        {
+            exit(1);
+        }
+    }
+    void beHost()
+    {
+        gType = INET_HOST;
+        Network::serverStartup(References::PORT);
+        std::string username="";
+        std::cout<<"Your user name: ";
+        std::cin>>username;
+        Network::clientStartup("127.0.0.1", 1);
+        Network::sendMessage(Network::soc,username);
     }
 
     namespace App
@@ -66,6 +108,12 @@ namespace Game
             Gaming
         } gameState;
 
+    }
+    void gameAllInit()
+    {
+        onGameRunning = true;
+        App::gameState = App::MainFrame;
+        win_control::consoleInit();
     }
 }
 
@@ -157,27 +205,64 @@ int main()
         {
         case Game::App::MainFrame:
         {
+            //not final from here on
+            char gameMode = 0;
+            while (1)
+            {
+                gameMode = std::getchar();
+                if (gameMode == '1')
+                { //be guest
+                    Game::beGuest();
+                    win_control::goxy(0,0);
+                    std::cout<<"Waiting for game start."<<std::endl;
+                }
+                if (gameMode == '2')
+                { //be host
+                    Game::beHost();
+                    win_control::goxy(0,0);
+                    std::cout<<"Waiting for players to connect."<<std::endl;
+                    win_control::goxy(1,0);
+                    std::cout<<"                                   ";
+                }
+            }
+            Game::App::gameState=Game::App::Waiting;
             break;
         }
         case Game::App::Waiting:
         {
-            Game::Network::Client &cl = Game::Network::clients[++Game::Network::clientConnected];
-            cl.sock=Game::Network::ac.accept();
-            asio::error_code err;
-            size_t len = cl.sock.read_some(asio::buffer(cl.username),err);
-            if (err && err != asio::error::eof)
-                throw asio::system_error(err);
+            if (Game::gType == Game::INET_HOST)
+            {
+                Game::Network::Client &cl = Game::Network::clients[++Game::Network::clientConnected];
+                cl.sock = Game::Network::ac.accept();
+                win_control::goxy(10,0);std::cout<<"fccf";
+                asio::error_code err;
+                size_t len = cl.sock.read_some(asio::buffer(cl.username), err);
+                if (err && err != asio::error::eof)
+                    throw asio::system_error(err);
 
-
-            if(Game::Network::clientConnected==Game::playerCount){
-                Game::App::gameState=Game::App::Gaming;
+                win_control::goxy(1,0);
+                std::cout<<"Now players: "<<Game::Network::clientConnected<<std::endl;
+                if (Game::Network::clientConnected == Game::playerCount)
+                {
+                    Game::Network::sendToAll("ec$gamestart");
+                    Game::App::gameState = Game::App::Gaming;
+                }
             }
-
+            else
+            {
+                std::string buf;
+                asio::error_code err;
+                Game::Network::soc.read_some(asio::buffer(buf), err);
+                if (buf == "ecc$gamestart")
+                {
+                    Game::App::gameState = Game::App::Gaming;
+                }
+            }
             break;
         }
         case Game::App::Gaming:
         {
-
+            
             break;
         }
         }

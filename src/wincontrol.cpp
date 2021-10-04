@@ -10,7 +10,7 @@ namespace win_control
     {
         SetConsoleTextAttribute(hOut, fColor | bColor << 4);
     }
-    void goxy(unsigned short x, unsigned short y)
+    void goxy(short x, short y)
     {
         COORD pos = {y, x};
         SetConsoleCursorPosition(hOut, pos);
