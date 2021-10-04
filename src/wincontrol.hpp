@@ -31,8 +31,8 @@ namespace win_control
 		c_WHITE = 0xf
 	};
 
-	void setColor(unsigned short, unsigned short);
-	void goxy(unsigned short x, unsigned short y);
+	void setColor(short, short);
+	void goxy(short, short);
 
 	void hideCursor();
 

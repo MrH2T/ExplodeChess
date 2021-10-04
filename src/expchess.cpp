@@ -22,20 +22,21 @@ namespace Game
     namespace Network
     {
 
-        asio::ip::tcp::socket soc;
+        asio::ip::tcp::socket soc(io_context);
 
-        asio::ip::tcp::acceptor ac;
-        struct Clients
+        asio::ip::tcp::acceptor ac(io_context);
+        struct Client
         {
             asio::ip::tcp::socket sock;
             std::string username;
+            Client() : sock(io_context), username("") {}
         } clients[Game::References::MAX_CLIENT_COUNT];
         void networkInit()
         {
         }
         void clientStartup(asio::ip::tcp::endpoint endpoint, bool localHost = 0)
         {
-            soc=asio::ip::tcp::socket(io_context,endpoint);
+            soc = asio::ip::tcp::socket(io_context, endpoint);
         }
         void serverStartup(int port)
         {
@@ -43,20 +44,19 @@ namespace Game
                 io_context,
                 asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port));
         }
-        
+
     }
 
     void gameAllInit()
     {
-        onGameRunning=true;
+        onGameRunning = true;
         win_control::consoleInit();
     }
 }
 int main()
 {
     Game::gameAllInit();
-    while(Game::onGameRunning){
-
+    while (Game::onGameRunning)
+    {
     }
-
 }
