@@ -40,7 +40,10 @@ namespace win_control
 
 	void cls();
 
-	namespace input_record{
+	void sleep(int);
+
+	namespace input_record
+	{
 		void keyHandler(int);
 		void getInput();
 	}
