@@ -6,12 +6,12 @@
 
 void win_control::cls()
 {
-    win_control::goxy(0,0);
-    for(short i=0;i<40;i++){
-        std::cout<<"                                                                                \n";
+    win_control::goxy(0, 0);
+    for (short i = 0; i < 40; i++)
+    {
+        std::cout << "                                                                                \n";
     }
 }
-
 
 namespace Game
 {
@@ -139,7 +139,7 @@ namespace Game
             << Game::References::EMPTYLINE << std::endl
             << Game::References::EMPTYLINE << std::endl
             << Game::References::EMPTYLINE << std::endl;
-        
+
         win_control::setTitle(L"Explode Chess - Waiting");
     }
     namespace App
@@ -152,6 +152,36 @@ namespace Game
         } gameState;
 
     }
+
+    void onHostAccept(asio::error_code err, asio::ip::tcp::socket sc)
+    {
+        Network::Client &cl = Network::clients[++Network::clientConnected];
+        cl.sock = std::move(sc);
+        std::array<char, 65536> tmp;
+        size_t len = cl.sock.read_some(asio::buffer(tmp), err);
+        cl.username = tmp.data();
+        cl.username.resize(len);
+        if (err && err != asio::error::eof)
+            throw asio::system_error(err);
+
+        win_control::goxy(2, 0);
+        std::cout << "Now players: " << Game::Network::clientConnected << std::endl;
+        for (int i = 1; i <= Game::Network::clientConnected; i++)
+            std::cout << "User #" << i << ": " << Game::Network::clients[i].username << std::endl;
+
+        if (Game::Network::clientConnected == Game::playerCount)
+        {
+
+            std::cout << "All players get ready. Game starts in 5 seconds!" << std::endl;
+            win_control::sleep(5000);
+
+            Game::Network::sendToAll("ec$gamestart");
+            Game::App::gameState = Game::App::Gaming;
+            win_control::cls();
+            win_control::setTitle(L"Explode Chess - Gaming");
+        }
+    }
+
     void gameAllInit()
     {
         onGameRunning = true;
@@ -164,18 +194,23 @@ namespace key_handling
 {
     void onUp()
     {
+        
     }
     void onDown()
     {
+
     }
     void onLeft()
     {
+
     }
     void onRight()
     {
+
     }
     void onConfirm()
     {
+        
     }
 }
 void ::win_control::input_record::keyHandler(int keyCode)
@@ -245,7 +280,7 @@ int main()
         Game::gameAllInit();
         while (Game::onGameRunning)
         {
-            win_control::input_record::getInput();
+            
             //    win_control::goxy(2,0);std::cout<<Game::App::gameState;
             switch (Game::App::gameState)
             {
@@ -285,9 +320,11 @@ int main()
                 if (Game::gType == Game::INET_HOST)
                 {
                     Game::Network::Client &cl = Game::Network::clients[++Game::Network::clientConnected];
-                    cl.sock = Game::Network::ac.accept();
-                    asio::error_code err;
+                    cl.sock = Game::Network::ac.accept(/* Game::onHostAccept */);
+
+                    //maybe will be ...
                     std::array<char, 65536> tmp;
+                    asio::error_code err;
                     size_t len = cl.sock.read_some(asio::buffer(tmp), err);
                     cl.username = tmp.data();
                     cl.username.resize(len);
@@ -302,7 +339,7 @@ int main()
                     if (Game::Network::clientConnected == Game::playerCount)
                     {
 
-                        std::cout<<"All players get ready. Game starts in 5 seconds!"<<std::endl;
+                        std::cout << "All players get ready. Game starts in 5 seconds!" << std::endl;
                         win_control::sleep(5000);
 
                         Game::Network::sendToAll("ec$gamestart");
@@ -313,7 +350,7 @@ int main()
                 }
                 else
                 {
-                    std::array<char,65536> buf;
+                    std::array<char, 65536> buf;
                     asio::error_code err;
                     size_t len = Game::Network::soc.read_some(asio::buffer(buf), err);
                     std::string tmp = buf.data();
@@ -329,7 +366,7 @@ int main()
             }
             case Game::App::Gaming:
             {
-                
+                win_control::input_record::getInput();
                 break;
             }
             }
