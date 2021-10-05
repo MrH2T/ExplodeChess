@@ -42,6 +42,8 @@ namespace win_control
 
 	void sleep(int);
 
+	void setTitle(const wchar_t*);
+
 	namespace input_record
 	{
 		void keyHandler(int);

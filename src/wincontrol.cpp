@@ -24,7 +24,7 @@ namespace win_control
     }
     void consoleInit()
     {
-
+        system("mode con cols=80 lines=40");
         SetConsoleCP(65001);
         SetConsoleTitle(L"Explode Chess");
         hideCursor();
@@ -34,9 +34,10 @@ namespace win_control
         Sleep(tm);
     }
 
-    void cls()
-    {
+    void setTitle(const wchar_t* title){
+        SetConsoleTitle(title);
     }
+
     namespace input_record
     {
         CONSOLE_SCREEN_BUFFER_INFO bInfo;
