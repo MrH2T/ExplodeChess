@@ -35,16 +35,16 @@ namespace Game
     win_control::Color pColor[References::MAX_CLIENT_COUNT + 1] = {
         win_control::Color::c_DGREY,
         win_control::Color::c_RED,
-        win_control::Color::c_DRED,
         win_control::Color::c_LIME,
         win_control::Color::c_LYELLOW,
+        win_control::Color::c_SKYBLUE,
         win_control::Color::c_PURPLE,
+        win_control::Color::c_LIGHTBLUE,
         win_control::Color::c_DPURPLE,
         win_control::Color::c_DARKBLUE,
         win_control::Color::c_DGREEN,
-        win_control::Color::c_SKYBLUE,
-        win_control::Color::c_LIGHTBLUE};
-
+        win_control::Color::c_DRED,
+    };
     int playerCount = 0;
     int mapSize = 0, map[References::MAX_MAP_SIZE][References::MAX_MAP_SIZE],
         cmap[References::MAX_MAP_SIZE][References::MAX_MAP_SIZE];
@@ -220,13 +220,31 @@ namespace Game
             }
             num[id] = num[id] * 10 + info[i] - '0';
         }
-        win_control::goxy(15, 0);
-        std::cout << num[0] << " " << num[1] << std::endl;
+        //    win_control::goxy(15, 0);
+        //     std::cout << num[0] << " " << num[1] << std::endl;
         Game::playerCount = num[0];
         Game::mapSize = num[1];
         Game::usercol = num[2];
     }
+    void printBlockBorder(int x, int y, win_control::Color col)
+    {
+        int fx = x * 2, fy = y * 4;
 
+        win_control::setColor(col, win_control::Color::c_GREY);
+        win_control::goxy(fx, fy);
+        std::cout << "+---+";
+        win_control::goxy(fx + 1, fy);
+        std::cout << "|";
+        win_control::goxy(fx + 1, fy + 4);
+        std::cout << "|";
+        win_control::goxy(fx + 2, fy);
+        std::cout << "+---+";
+        win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
+    }
+    void printChoosingBlock()
+    {
+        printBlockBorder(choosingPosition.X, choosingPosition.Y, pColor[usercol]);
+    }
     void drawMap(int fx = 0, int fy = 0, int tx = mapSize - 1, int ty = mapSize - 1)
     {
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
@@ -267,6 +285,7 @@ namespace Game
     void gameStart()
     {
         drawMap();
+        printChoosingBlock();
         nowTurn = 1;
     }
 }
@@ -275,19 +294,35 @@ namespace key_handling
 {
     void onUp()
     {
-        Game::choosingPosition.X = std::max(0, Game::choosingPosition.X - 1);
+        if (Game::choosingPosition.X == 0)
+            return;
+        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::choosingPosition.X--;
+        Game::printChoosingBlock();
     }
     void onDown()
     {
-        Game::choosingPosition.X = std::min(Game::mapSize - 1, Game::choosingPosition.X + 1);
+        if (Game::choosingPosition.X == Game::mapSize - 1)
+            return;
+        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::choosingPosition.X++;
+        Game::printChoosingBlock();
     }
     void onLeft()
     {
-        Game::choosingPosition.Y = std::max(0, Game::choosingPosition.Y - 1);
+        if (Game::choosingPosition.Y == 0)
+            return;
+        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::choosingPosition.Y--;
+        Game::printChoosingBlock();
     }
     void onRight()
     {
-        Game::choosingPosition.Y = std::min(Game::mapSize - 1, Game::choosingPosition.Y + 1);
+        if (Game::choosingPosition.Y == Game::mapSize - 1)
+            return;
+        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::choosingPosition.Y++;
+        Game::printChoosingBlock();
     }
     void onConfirm()
     {
@@ -432,11 +467,12 @@ int main()
                         std::cout << "All players get ready. Game starts in 1 seconds!" << std::endl;
                         win_control::sleep(1000);
 
-                        std::string gameInfo = std::to_string(Game::playerCount) + '$' + std::to_string(Game::mapSize)+'$';
-                        for (int i = 1; i <= Game::Network::clientConnected; i++)
+                        std::string gameInfo = std::to_string(Game::playerCount) + '$' + std::to_string(Game::mapSize) + '$';
+                        for (int i = 2; i <= Game::Network::clientConnected; i++)
                         {
                             Game::Network::sendMessage(Game::Network::clients[i].sock, "ec$gamestart$" + gameInfo + std::to_string(i));
                         }
+                        Game::usercol=1;
                         Game::App::gameState = Game::App::Gaming;
                         win_control::cls();
                         win_control::setTitle(L"Explode Chess - Gaming");
