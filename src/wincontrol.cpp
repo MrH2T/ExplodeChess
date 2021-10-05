@@ -6,9 +6,9 @@ HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
 namespace win_control
 {
-    void setColor(unsigned short fColor, unsigned short bColor)
+    void setColor(Color fColor, Color bColor)
     {
-        SetConsoleTextAttribute(hOut, fColor | bColor << 4);
+        SetConsoleTextAttribute(hOut, short(fColor) | short(bColor) << 4);
     }
     void goxy(short x, short y)
     {

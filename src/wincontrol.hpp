@@ -3,7 +3,7 @@
 
 namespace win_control
 {
-	enum class Color
+	enum class Color: short
 	{
 		c_BLACK = 0x0,
 		c_DARKBLUE = 0x1,
@@ -31,7 +31,7 @@ namespace win_control
 		c_WHITE = 0xf
 	};
 
-	void setColor(short, short);
+	void setColor(Color, Color);
 	void goxy(short, short);
 
 	void hideCursor();
