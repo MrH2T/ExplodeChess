@@ -47,10 +47,12 @@ namespace Game
         win_control::Color::c_PURPLE,
         win_control::Color::c_DRED,
     };
-    int playerCount = 0;
+    int playerCount = 0, playerAlive = 0;
     int mapSize = 0, map[References::MAX_MAP_SIZE][References::MAX_MAP_SIZE],
         cmap[References::MAX_MAP_SIZE][References::MAX_MAP_SIZE];
-    bool playerDied[References::MAX_CLIENT_COUNT];
+    bool playerDied[References::MAX_CLIENT_COUNT], initialed[References::MAX_CLIENT_COUNT];
+    int blocks[References::MAX_CLIENT_COUNT];
+    std::string usrNames[References::MAX_CLIENT_COUNT];
 
     COORD choosingPosition = {0, 0};
     int nowTurn, usercol;
@@ -247,8 +249,10 @@ namespace Game
 
     void guestSolveGameInfo(std::string info)
     {
+
         int num[3] = {0};
-        for (int i = 0, id = 0; i < info.size(); i++)
+        int i, id;
+        for (i = 0, id = 0; i < info.size() && id <= 2; i++)
         {
             if (info[i] == '$')
             {
@@ -262,6 +266,17 @@ namespace Game
         Game::playerCount = num[0];
         Game::mapSize = num[1];
         Game::usercol = num[2];
+
+        for (id = 1; id <= playerCount && i < info.size(); i++)
+        {
+            if (info[i] == '$')
+            {
+                usrNames[id] += '\000';
+                id++;
+                continue;
+            }
+            usrNames[id] += info[i];
+        }
     }
     void printBlockBorder(int x, int y, win_control::Color col)
     {
@@ -319,6 +334,40 @@ namespace Game
         }
     }
 
+    void drawUserTable()
+    {
+        for (int i = 1; i <= Game::playerCount; i++)
+        {
+            win_control::goxy(4 + i, 63);
+            if (i == nowTurn)
+            {
+                win_control::setColor(pColor[nowTurn], win_control::Color::c_BLACK);
+                std::cout << ">";
+                win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_BLACK);
+                std::cout << " ";
+            }
+            else
+            {
+                win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_BLACK);
+                std::cout << "  ";
+            }
+            if (playerDied[i])
+                win_control::setColor(win_control::Color::c_GREY, win_control::Color::c_BLACK);
+            else
+                win_control::setColor(pColor[i], win_control::Color::c_BLACK);
+            std::cout << blocks[i] << " " << Game::usrNames[i];
+        }
+    }
+    void drawOneUser(int usr)
+    {
+        win_control::goxy(4 + usr, 65);
+        if (playerDied[usr])
+            win_control::setColor(win_control::Color::c_GREY, win_control::Color::c_BLACK);
+        else
+            win_control::setColor(pColor[usr], win_control::Color::c_BLACK);
+        std::cout << blocks[usr] << " " << Network::clients[usr].username;
+    }
+
     namespace Explosion
     {
         const int dir[4][2] = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
@@ -329,10 +378,9 @@ namespace Game
     {
         while (!Explosion::qu.empty())
             Explosion::qu.pop();
-        if(map[x][y]==fullAtPos(x,y))Explosion::qu.push(std::make_pair(x, y));
-
-
-        int combo=0;
+        if (map[x][y] == fullAtPos(x, y))
+            Explosion::qu.push(std::make_pair(x, y));
+        int combo = 0;
 
         while (!Explosion::qu.empty())
         {
@@ -341,11 +389,40 @@ namespace Game
             combo++;
             map[hd.first][hd.second] = 0;
             cmap[hd.first][hd.second] = 0;
+            blocks[nowTurn]--;
             for (int di = 0; di < 4; di++)
             {
                 int dx = hd.first + Explosion::dir[di][0], dy = hd.second + Explosion::dir[di][1];
                 if (dx < 0 || dx >= mapSize || dy < 0 || dy >= mapSize)
                     continue;
+                if (cmap[dx][dy] != targetColor)
+                    blocks[nowTurn]++;
+                if (cmap[dx][dy] && targetColor != cmap[dx][dy])
+                {
+                    blocks[cmap[dx][dy]]--;
+                    if (!blocks[cmap[dx][dy]])
+                    {
+                        playerDied[cmap[dx][dy]] = 1;
+                        playerAlive--;
+                        if (playerAlive == 1)
+                        {
+                            cmap[dx][dy] = targetColor;
+                            map[dx][dy]++;
+                            drawMapItem(hd.first, hd.second);
+                            for (int di = 0; di < 4; di++)
+                            {
+                                int dx = hd.first + Explosion::dir[di][0], dy = hd.second + Explosion::dir[di][1];
+                                if (dx < 0 || dx >= mapSize || dy < 0 || dy >= mapSize)
+                                    continue;
+                                drawMapItem(dx, dy);
+                            }
+
+                            drawUserTable();
+                            win_control::sleep(2000);
+                            exit(0);
+                        }
+                    }
+                }
                 cmap[dx][dy] = targetColor;
                 map[dx][dy]++;
                 if (map[dx][dy] == fullAtPos(dx, dy))
@@ -361,9 +438,19 @@ namespace Game
                 drawMapItem(dx, dy);
             }
 
-            if(combo<20)Sleep(600);
-            else Sleep(300);
+            drawUserTable();
+            win_control::goxy(2, 63);
+            win_control::setColor(pColor[targetColor], win_control::Color::c_BLACK);
+            std::cout << "Combo: " << combo;
+            if (combo < 20)
+                Sleep(1000);
+            else
+                Sleep(500);
         }
+        Sleep(100);
+        win_control::goxy(2, 63);
+        win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_BLACK);
+        std::cout << "           ";
     }
     void readNetworkInfo(std::string info)
     {
@@ -384,11 +471,23 @@ namespace Game
 
             x = num[0], y = num[1];
             //        std::cout << "Pos in readNetworkInfo() : " << x << " " << y << std::endl;
+
+            if (map[x][y] == 0)
+            {
+                if (!initialed[nowTurn])
+                {
+                    initialed[nowTurn] = 1;
+                }
+                blocks[nowTurn]++;
+            }
             map[x][y]++;
             cmap[x][y] = nowTurn;
             drawMapItem(x, y);
             checkExplode(nowTurn, x, y);
+            //    drawMap();
+            // printChoosingBlock();
             nextPlayer();
+            drawUserTable();
         }
     }
     void serverSolveInfo(std::string info, size_t len)
@@ -459,9 +558,11 @@ namespace Game
 
     void gameStart()
     {
-        drawMap();
-        printChoosingBlock();
         nowTurn = 1;
+        drawMap();
+        drawUserTable();
+        printChoosingBlock();
+        playerAlive = playerCount;
     }
 
 }
@@ -577,9 +678,9 @@ void ::win_control::input_record::keyHandler(int keyCode)
     }
     case VK_ESCAPE:
     {
+        exit(0);
         Game::Thread::joinAllThreads();
         Game::io_context.stop();
-        exit(0);
     }
     default:
         break;
@@ -662,10 +763,16 @@ int main()
                         std::cout << "All players get ready. Game starts in 1 seconds!" << std::endl;
                         win_control::sleep(1000);
 
-                        std::string gameInfo = std::to_string(Game::playerCount) + '$' + std::to_string(Game::mapSize) + '$';
+                        std::string gameInfo = std::to_string(Game::playerCount) + '$' + std::to_string(Game::mapSize);
+                        std::string users = "";
+                        for (int i = 1; i <= Game::playerCount; i++)
+                        {
+                            users += Game::Network::clients[i].username + '$';
+                            Game::usrNames[i] = Game::Network::clients[i].username;
+                        }
                         for (int i = 2; i <= Game::Network::clientConnected; i++)
                         {
-                            Game::Network::sendMessage(Game::Network::clients[i].sock, "ec$gamestart$" + gameInfo + std::to_string(i));
+                            Game::Network::sendMessage(Game::Network::clients[i].sock, "ec$gamestart$" + gameInfo + '$' + std::to_string(i) + '$' + users);
                         }
                         Game::usercol = 1;
                         Game::App::gameState = Game::App::Gaming;
