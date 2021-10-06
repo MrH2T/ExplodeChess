@@ -416,9 +416,13 @@ namespace Game
                                     continue;
                                 drawMapItem(dx, dy);
                             }
+                            onGameRunning=false;
+                            Network::sendMessage(Network::soc,"ec$gameend");
 
                             drawUserTable();
                             win_control::sleep(2000);
+
+                            Thread::joinAllThreads();
                             exit(0);
                         }
                     }
@@ -511,9 +515,14 @@ namespace Game
                 std::array<char, 65536> buf;
                 asio::error_code err;
                 size_t len;
-                while (1)
+                while (Game::onGameRunning)
                 {
                     len = cl.sock.read_some(asio::buffer(buf), err);
+                    if(buf.data()=="ec$gameend"){
+                        Network::sendToAll("ec$gameeend");
+                        onGameRunning=false;
+                        return;
+                    }
                     serverSolveInfo(buf.data(), len);
                     if (Game::io_context.stopped())
                         return;
@@ -535,9 +544,12 @@ namespace Game
             std::array<char, 65536> buf;
             asio::error_code err;
             size_t len;
-            while (1)
+            while (Game::onGameRunning)
             {
                 len = Network::soc.read_some(asio::buffer(buf), err);
+                if(buf.data()=="ec$gameend"){
+                    return;
+                }
                 readNetworkInfo(buf.data());
                 if (Game::io_context.stopped())
                     return;
@@ -678,9 +690,9 @@ void ::win_control::input_record::keyHandler(int keyCode)
     }
     case VK_ESCAPE:
     {
-        exit(0);
         Game::Thread::joinAllThreads();
         Game::io_context.stop();
+        exit(0);
     }
     default:
         break;
