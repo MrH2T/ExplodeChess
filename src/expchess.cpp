@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include <iomanip>
 #include <queue>
 #include <thread>
 #include <array>
@@ -8,6 +9,7 @@
 
 void win_control::cls()
 {
+    win_control::setColor(win_control::Color::c_BLACK,win_control::Color::c_BLACK);
     win_control::goxy(0, 0);
     for (short i = 0; i < 40; i++)
     {
@@ -19,6 +21,8 @@ namespace Game
 {
     volatile bool onGameRunning;
     asio::io_context io_context;
+
+    bool control_painting, move_painting;
 
     enum GameType
     {
@@ -278,8 +282,11 @@ namespace Game
             usrNames[id] += info[i];
         }
     }
-    void printBlockBorder(int x, int y, win_control::Color col)
+    void drawBlockBorder(int x, int y, win_control::Color col)
     {
+        while (control_painting)
+            ;
+        move_painting = true;
         int fx = x * 2, fy = y * 4;
 
         win_control::setColor(col, win_control::Color::c_GREY);
@@ -292,20 +299,28 @@ namespace Game
         win_control::goxy(fx + 2, fy);
         std::cout << "+---+";
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
+        move_painting = false;
     }
-    void printChoosingBlock()
+    void drawChoosingBlock()
     {
-        printBlockBorder(choosingPosition.X, choosingPosition.Y, pColor[usercol]);
+        drawBlockBorder(choosingPosition.X, choosingPosition.Y, pColor[usercol]);
     }
     void drawMapItem(int x, int y)
     {
+        while (move_painting)
+            ;
+        control_painting = true;
         win_control::goxy(2 * x + 1, 4 * y + 1);
         win_control::setColor(pColor[cmap[x][y]], win_control::Color::c_GREY);
         std::cout << map[x][y] << "/" << fullAtPos(x, y);
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
+        control_painting = false;
     }
     void drawMap()
     {
+        while (move_painting)
+            ;
+        control_painting = true;
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
         win_control::goxy(0, 0);
         std::cout << "+";
@@ -332,10 +347,14 @@ namespace Game
             }
             std::cout << std::endl;
         }
+        control_painting = false;
     }
 
     void drawUserTable()
     {
+        while (move_painting)
+            ;
+        control_painting = true;
         for (int i = 1; i <= Game::playerCount; i++)
         {
             win_control::goxy(4 + i, 63);
@@ -355,17 +374,36 @@ namespace Game
                 win_control::setColor(win_control::Color::c_GREY, win_control::Color::c_BLACK);
             else
                 win_control::setColor(pColor[i], win_control::Color::c_BLACK);
-            std::cout << blocks[i] << " " << Game::usrNames[i];
+            std::cout << std::setw(3) << blocks[i] << " " << Game::usrNames[i];
         }
+        control_painting = false;
     }
     void drawOneUser(int usr)
     {
+        while (move_painting)
+            ;
+        control_painting = true;
         win_control::goxy(4 + usr, 65);
         if (playerDied[usr])
             win_control::setColor(win_control::Color::c_GREY, win_control::Color::c_BLACK);
         else
             win_control::setColor(pColor[usr], win_control::Color::c_BLACK);
         std::cout << blocks[usr] << " " << Network::clients[usr].username;
+        control_painting = false;
+    }
+    void drawCombo(int combo, win_control::Color col)
+    {
+        while (move_painting)
+            ;
+
+        control_painting = true;
+        win_control::goxy(2, 63);
+        win_control::setColor(col, win_control::Color::c_BLACK);
+        if (combo == -1)
+            std::cout << "            ";
+        else
+            std::cout << "Combo: " << combo;
+        control_painting = false;
     }
 
     namespace Explosion
@@ -416,8 +454,8 @@ namespace Game
                                     continue;
                                 drawMapItem(dx, dy);
                             }
-                            onGameRunning=false;
-                            Network::sendMessage(Network::soc,"ec$gameend");
+                            onGameRunning = false;
+                            Network::sendMessage(Network::soc, "ec$gameend");
 
                             drawUserTable();
                             win_control::sleep(2000);
@@ -443,19 +481,23 @@ namespace Game
             }
 
             drawUserTable();
-            win_control::goxy(2, 63);
-            win_control::setColor(pColor[targetColor], win_control::Color::c_BLACK);
-            std::cout << "Combo: " << combo;
+            drawCombo(combo,pColor[nowTurn]);
             if (combo < 20)
                 Sleep(1000);
             else
                 Sleep(500);
         }
         Sleep(100);
-        win_control::goxy(2, 63);
-        win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_BLACK);
-        std::cout << "           ";
+        drawCombo(-1,win_control::Color::c_BLACK);
     }
+
+    void renderScreen(){
+        win_control::cls();
+        drawMap();
+        drawUserTable();
+        drawChoosingBlock();
+    }
+
     void readNetworkInfo(std::string info)
     {
         if (info.substr(0, 6) == "ec$op$")
@@ -518,9 +560,10 @@ namespace Game
                 while (Game::onGameRunning)
                 {
                     len = cl.sock.read_some(asio::buffer(buf), err);
-                    if(buf.data()=="ec$gameend"){
+                    if (buf.data() == "ec$gameend")
+                    {
                         Network::sendToAll("ec$gameeend");
-                        onGameRunning=false;
+                        onGameRunning = false;
                         return;
                     }
                     serverSolveInfo(buf.data(), len);
@@ -547,7 +590,8 @@ namespace Game
             while (Game::onGameRunning)
             {
                 len = Network::soc.read_some(asio::buffer(buf), err);
-                if(buf.data()=="ec$gameend"){
+                if (buf.data() == "ec$gameend")
+                {
                     return;
                 }
                 readNetworkInfo(buf.data());
@@ -571,9 +615,10 @@ namespace Game
     void gameStart()
     {
         nowTurn = 1;
+        control_painting=move_painting=false;
         drawMap();
         drawUserTable();
-        printChoosingBlock();
+        drawChoosingBlock();
         playerAlive = playerCount;
     }
 
@@ -585,33 +630,33 @@ namespace key_handling
     {
         if (Game::choosingPosition.X == 0)
             return;
-        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::drawBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
         Game::choosingPosition.X--;
-        Game::printChoosingBlock();
+        Game::drawChoosingBlock();
     }
     void onDown()
     {
         if (Game::choosingPosition.X == Game::mapSize - 1)
             return;
-        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::drawBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
         Game::choosingPosition.X++;
-        Game::printChoosingBlock();
+        Game::drawChoosingBlock();
     }
     void onLeft()
     {
         if (Game::choosingPosition.Y == 0)
             return;
-        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::drawBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
         Game::choosingPosition.Y--;
-        Game::printChoosingBlock();
+        Game::drawChoosingBlock();
     }
     void onRight()
     {
         if (Game::choosingPosition.Y == Game::mapSize - 1)
             return;
-        Game::printBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
+        Game::drawBlockBorder(Game::choosingPosition.X, Game::choosingPosition.Y, win_control::Color::c_BLACK);
         Game::choosingPosition.Y++;
-        Game::printChoosingBlock();
+        Game::drawChoosingBlock();
     }
     void onConfirm()
     {
@@ -693,6 +738,9 @@ void ::win_control::input_record::keyHandler(int keyCode)
         Game::Thread::joinAllThreads();
         Game::io_context.stop();
         exit(0);
+    }
+    case 'R':{
+        Game::renderScreen();
     }
     default:
         break;
