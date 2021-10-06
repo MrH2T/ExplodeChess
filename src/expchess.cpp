@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include <queue>
 #include <thread>
 #include <array>
 #include "wincontrol.hpp"
@@ -51,14 +52,15 @@ namespace Game
         cmap[References::MAX_MAP_SIZE][References::MAX_MAP_SIZE];
     bool playerDied[References::MAX_CLIENT_COUNT];
 
-
     COORD choosingPosition = {0, 0};
     int nowTurn, usercol;
 
-    void nextPlayer(){
-        nowTurn=nowTurn%playerCount+1;
-        while(playerDied[nowTurn]){
-            nowTurn=nowTurn%playerCount+1;
+    void nextPlayer()
+    {
+        nowTurn = nowTurn % playerCount + 1;
+        while (playerDied[nowTurn])
+        {
+            nowTurn = nowTurn % playerCount + 1;
         }
     }
 
@@ -316,8 +318,52 @@ namespace Game
             std::cout << std::endl;
         }
     }
-    void checkExplode()
+
+    namespace Explosion
     {
+        const int dir[4][2] = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
+        std::queue<std::pair<int, int>> qu;
+    }
+
+    void checkExplode(int targetColor, int x, int y)
+    {
+        while (!Explosion::qu.empty())
+            Explosion::qu.pop();
+        if(map[x][y]==fullAtPos(x,y))Explosion::qu.push(std::make_pair(x, y));
+
+
+        int combo=0;
+
+        while (!Explosion::qu.empty())
+        {
+            std::pair<int, int> hd = Explosion::qu.front();
+            Explosion::qu.pop();
+            combo++;
+            map[hd.first][hd.second] = 0;
+            cmap[hd.first][hd.second] = 0;
+            for (int di = 0; di < 4; di++)
+            {
+                int dx = hd.first + Explosion::dir[di][0], dy = hd.second + Explosion::dir[di][1];
+                if (dx < 0 || dx >= mapSize || dy < 0 || dy >= mapSize)
+                    continue;
+                cmap[dx][dy] = targetColor;
+                map[dx][dy]++;
+                if (map[dx][dy] == fullAtPos(dx, dy))
+                    Explosion::qu.push(std::make_pair(dx, dy));
+            }
+
+            drawMapItem(hd.first, hd.second);
+            for (int di = 0; di < 4; di++)
+            {
+                int dx = hd.first + Explosion::dir[di][0], dy = hd.second + Explosion::dir[di][1];
+                if (dx < 0 || dx >= mapSize || dy < 0 || dy >= mapSize)
+                    continue;
+                drawMapItem(dx, dy);
+            }
+
+            if(combo<20)Sleep(600);
+            else Sleep(300);
+        }
     }
     void readNetworkInfo(std::string info)
     {
@@ -337,12 +383,12 @@ namespace Game
             }
 
             x = num[0], y = num[1];
-    //        std::cout << "Pos in readNetworkInfo() : " << x << " " << y << std::endl;
+            //        std::cout << "Pos in readNetworkInfo() : " << x << " " << y << std::endl;
             map[x][y]++;
-            cmap[x][y]=nowTurn;
-            nextPlayer();
+            cmap[x][y] = nowTurn;
             drawMapItem(x, y);
-            checkExplode();
+            checkExplode(nowTurn, x, y);
+            nextPlayer();
         }
     }
     void serverSolveInfo(std::string info, size_t len)
@@ -366,9 +412,12 @@ namespace Game
                 std::array<char, 65536> buf;
                 asio::error_code err;
                 size_t len;
-                while(1){
+                while (1)
+                {
                     len = cl.sock.read_some(asio::buffer(buf), err);
                     serverSolveInfo(buf.data(), len);
+                    if (Game::io_context.stopped())
+                        return;
                 }
             });
 
@@ -387,9 +436,12 @@ namespace Game
             std::array<char, 65536> buf;
             asio::error_code err;
             size_t len;
-            while(1){
+            while (1)
+            {
                 len = Network::soc.read_some(asio::buffer(buf), err);
                 readNetworkInfo(buf.data());
+                if (Game::io_context.stopped())
+                    return;
             }
         });
 
@@ -526,6 +578,7 @@ void ::win_control::input_record::keyHandler(int keyCode)
     case VK_ESCAPE:
     {
         Game::Thread::joinAllThreads();
+        Game::io_context.stop();
         exit(0);
     }
     default:
