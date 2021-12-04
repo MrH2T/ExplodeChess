@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "Win64",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
@@ -10,13 +10,10 @@
                 "UNICODE",
                 "_UNICODE"
             ],
-            "compilerPath": "C:\\Program Files (x86)\\Dev-Cpp\\MinGW64\\bin\\g++.exe",
+            "compilerPath": "D:/TDM-GCC-64/bin/g++.exe",
             "cStandard": "c17",
             "cppStandard": "c++14",
-            "intelliSenseMode": "gcc-x64",
-            "compilerArgs": [
-                "-IR:\\asio-1.18.2\\include"
-            ]
+            "intelliSenseMode": "windows-clang-x64"
         }
     ],
     "version": 4
