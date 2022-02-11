@@ -1,6 +1,6 @@
-Compiler = "D:\TDM-GCC-64\bin\g++.exe"
+Compiler = "R:\TDM-GCC\bin\g++.exe"
 Options = "-DUNICODE -std=c++14"
-ASIOpath = "D:\asio\asio-1.20.0\include"
+ASIOpath = "R:\asio-1.20.0\include"
 Linker = "-static"
 
 .PHONY: clear

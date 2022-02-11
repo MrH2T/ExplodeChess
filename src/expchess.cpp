@@ -15,14 +15,14 @@ void win_control::cls()
     {
         std::cout << "                                                                                \n";
     }
+    win_control::goxy(0, 0);
 }
 
 namespace Game
 {
     volatile bool onGameRunning;
-    asio::io_context io_context;
 
-    bool control_painting, move_painting;
+    bool painting;
 
     enum GameType
     {
@@ -30,12 +30,28 @@ namespace Game
         INET_GUEST,
         LOCAL
     } gType;
+
     namespace References
     {
         const size_t MAX_CLIENT_COUNT = 10;
         const int PORT = 14514;
         const int MAX_MAP_SIZE = 15;
         const std::string EMPTYLINE = "                                                              ";
+    }
+
+    namespace Debug
+    {
+        const bool DEBUG = false;
+        const short DBG_X[3]={20,25,30}, DBG_Y = 0, DBG_X2 = 30;
+        void dprint(char* s,int pos=0){
+            if(!DEBUG)return;
+            while(painting);
+            painting=true;
+            win_control::goxy(DBG_X[pos],DBG_Y);
+            std::cout<<s;
+
+            painting=false;
+        }
     }
 
     win_control::Color pColor[References::MAX_CLIENT_COUNT + 1] = {
@@ -82,6 +98,7 @@ namespace Game
 
     namespace Network
     {
+        asio::io_context io_context;
 
         asio::ip::tcp::socket soc(io_context);
 
@@ -138,22 +155,35 @@ namespace Game
     namespace Thread
     {
         std::thread receiveThread, toClient[References::MAX_CLIENT_COUNT];
-        void joinAllThreads()
-        {
-            if (Game::Thread::receiveThread.joinable())
-                Game::Thread::receiveThread.join();
+        void joinClientThreads(){
+            return;
             if (Game::gType == Game::INET_HOST)
             {
+                try{
                 for (int i = 1; i <= Game::Network::clientConnected; i++)
                     if (Game::Thread::toClient[i].joinable())
                         Game::Thread::toClient[i].join();
+                }catch(...){
+                    std::cout<<"Error on joining toClient Thread!\n";
+                }
             }
+        }
+        void joinServerThread()
+        {
+            return;
+            try{
+            if (Game::Thread::receiveThread.joinable())
+                Game::Thread::receiveThread.join();
+            }catch(...){
+                std::cout<<"Cannot join receiveThread!\n";
+            }
+            
         }
     }
     void beGuest()
     {
         //not final version
-
+        win_control::goxy(0,0);
         gType = INET_GUEST;
         std::cout << "IP Address: ";
         std::string ipAddress;
@@ -176,6 +206,7 @@ namespace Game
     void beHost()
     {
         gType = INET_HOST;
+        win_control::goxy(0,0);
         Network::serverStartup(References::PORT);
         while (Game::playerCount < 2 || Game::playerCount > 10)
         {
@@ -284,9 +315,9 @@ namespace Game
     }
     void drawBlockBorder(int x, int y, win_control::Color col)
     {
-        while (control_painting)
+        while (painting)
             ;
-        move_painting = true;
+        painting = true;
         int fx = x * 2, fy = y * 4;
 
         win_control::setColor(col, win_control::Color::c_GREY);
@@ -299,7 +330,7 @@ namespace Game
         win_control::goxy(fx + 2, fy);
         std::cout << "+---+";
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
-        move_painting = false;
+        painting = false;
     }
     void drawChoosingBlock()
     {
@@ -307,20 +338,20 @@ namespace Game
     }
     void drawMapItem(int x, int y)
     {
-        while (move_painting)
+        while (painting)
             ;
-        control_painting = true;
+        painting = true;
         win_control::goxy(2 * x + 1, 4 * y + 1);
         win_control::setColor(pColor[cmap[x][y]], win_control::Color::c_GREY);
         std::cout << map[x][y] << "/" << fullAtPos(x, y);
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
-        control_painting = false;
+        painting = false;
     }
     void drawMap()
     {
-        while (move_painting)
+        while (painting)
             ;
-        control_painting = true;
+        painting = true;
         win_control::setColor(win_control::Color::c_BLACK, win_control::Color::c_GREY);
         win_control::goxy(0, 0);
         std::cout << "+";
@@ -347,14 +378,14 @@ namespace Game
             }
             std::cout << std::endl;
         }
-        control_painting = false;
+        painting = false;
     }
 
     void drawUserTable()
     {
-        while (move_painting)
+        while (painting)
             ;
-        control_painting = true;
+        painting = true;
         for (int i = 1; i <= Game::playerCount; i++)
         {
             win_control::goxy(4 + i, 63);
@@ -376,40 +407,66 @@ namespace Game
                 win_control::setColor(pColor[i], win_control::Color::c_BLACK);
             std::cout << std::setw(3) << blocks[i] << " " << Game::usrNames[i];
         }
-        control_painting = false;
+        painting = false;
     }
     void drawOneUser(int usr)
     {
-        while (move_painting)
+        while (painting)
             ;
-        control_painting = true;
+        painting = true;
         win_control::goxy(4 + usr, 65);
         if (playerDied[usr])
             win_control::setColor(win_control::Color::c_GREY, win_control::Color::c_BLACK);
         else
             win_control::setColor(pColor[usr], win_control::Color::c_BLACK);
         std::cout << blocks[usr] << " " << Network::clients[usr].username;
-        control_painting = false;
+        painting = false;
     }
     void drawCombo(int combo, win_control::Color col)
     {
-        while (move_painting)
+        while (painting)
             ;
 
-        control_painting = true;
+        painting = true;
         win_control::goxy(2, 63);
         win_control::setColor(col, win_control::Color::c_BLACK);
         if (combo == -1)
             std::cout << "            ";
         else
             std::cout << "Combo: " << combo;
-        control_painting = false;
+        painting = false;
     }
 
     namespace Explosion
     {
         const int dir[4][2] = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
         std::queue<std::pair<int, int>> qu;
+    }
+
+    void gameEnd(){
+        Debug::dprint("Client Gameend\n",2);
+        Network::sendMessage(Network::soc, "ec$gameend");
+        drawUserTable();
+        if(Debug::DEBUG){
+            win_control::sleep(1000);
+            // Debug::dprint(std::string(Thread::receiveThread.));
+            while(1);
+        }
+        win_control::sleep(2000);
+        win_control::cls();
+        win_control::setColor(win_control::Color::c_WHITE,win_control::Color::c_BLACK);
+        onGameRunning = false;
+        Network::io_context.stop();
+        try{
+            Thread::joinServerThread();
+            Thread::joinClientThreads();
+            exit(0);
+        }
+        catch(std::exception &e){
+            std::cout<<e.what()<<std::endl;
+            while(1);
+            exit(0);
+        }
     }
 
     void checkExplode(int targetColor, int x, int y)
@@ -454,14 +511,7 @@ namespace Game
                                     continue;
                                 drawMapItem(dx, dy);
                             }
-                            onGameRunning = false;
-                            Network::sendMessage(Network::soc, "ec$gameend");
-
-                            drawUserTable();
-                            win_control::sleep(2000);
-
-                            Thread::joinAllThreads();
-                            exit(0);
+                            gameEnd();
                         }
                     }
                 }
@@ -560,29 +610,25 @@ namespace Game
                 while (Game::onGameRunning)
                 {
                     len = cl.sock.read_some(asio::buffer(buf), err);
-                    if (buf.data() == "ec$gameend")
+                    Debug::dprint(buf.data());
+                    if (std::string(buf.data()) == "ec$gameend")
                     {
-                        Network::sendToAll("ec$gameeend");
-                        onGameRunning = false;
+                        Debug::dprint("Server go into ec$gameend\n");
+                        Network::sendMessage(cl.sock,"ec$gameend");
+                        Debug::dprint("Server message sent\n");
                         return;
                     }
                     serverSolveInfo(buf.data(), len);
-                    if (Game::io_context.stopped())
+                    if (Game::Network::io_context.stopped())
                         return;
                 }
             });
-
-            // cl.sock.async_read_some(asio::buffer(buf), [&](const asio::error_code err, std::size_t len) -> void {
-            //     win_control::goxy(18, 0);
-            //     std::cout << "read by lambda: " << buf.data() << std::endl;
-            //     serverSolveInfo(buf.data(), len);
-            // });
+            Thread::toClient[i].detach();
         }
     }
 
     void startGuestListening()
     {
-
         Thread::receiveThread = std::thread([&]() -> void {
             std::array<char, 65536> buf;
             asio::error_code err;
@@ -590,19 +636,22 @@ namespace Game
             while (Game::onGameRunning)
             {
                 len = Network::soc.read_some(asio::buffer(buf), err);
-                if (buf.data() == "ec$gameend")
+                Debug::dprint("Recv",1);
+                Debug::dprint(buf.data(),1);
+                if (std::string(buf.data()) == "ec$gameend")
                 {
+                    Debug::dprint("receiveThread Ended!\n",1);
                     return;
                 }
                 readNetworkInfo(buf.data());
-                if (Game::io_context.stopped())
+                if (Game::Network::io_context.stopped()){
+                    Debug::dprint("receiveThread Ended!\n",1);
                     return;
+                }
             }
+            Debug::dprint("receiveThread Ended!\n",1);
         });
-
-        // Network::soc.async_read_some(asio::buffer(buf), [&](const asio::error_code err, std::size_t len) -> void {
-        //     readNetworkInfo(buf.data());
-        // });
+        Thread::receiveThread.detach();
     }
 
     void gameAllInit()
@@ -615,7 +664,7 @@ namespace Game
     void gameStart()
     {
         nowTurn = 1;
-        control_painting=move_painting=false;
+        painting=false;
         drawMap();
         drawUserTable();
         drawChoosingBlock();
@@ -735,8 +784,9 @@ void ::win_control::input_record::keyHandler(int keyCode)
     }
     case VK_ESCAPE:
     {
-        Game::Thread::joinAllThreads();
-        Game::io_context.stop();
+        Game::Thread::joinServerThread();
+        Game::Thread::joinClientThreads();
+        Game::Network::io_context.stop();
         exit(0);
     }
     case 'R':{
@@ -753,19 +803,24 @@ int main()
         Game::gameAllInit();
         while (Game::onGameRunning)
         {
-
-            //    win_control::goxy(2,0);std::cout<<Game::App::gameState;
             switch (Game::App::gameState)
             {
             case Game::App::MainFrame:
             {
                 //not final from here on
                 char gameMode = 0;
+                std::cout << "Input game mode (1: Client; 2: Server) :" << std::endl;
                 while (1)
                 {
+
                     gameMode = std::getchar();
                     if (gameMode == '1')
                     { //be guest
+                        win_control::goxy(0,0);
+                        std::cout << Game::References::EMPTYLINE << std::endl
+                                  << Game::References::EMPTYLINE << std::endl
+                                  << Game::References::EMPTYLINE << std::endl
+                                  << Game::References::EMPTYLINE << std::endl;
                         Game::beGuest();
                         win_control::goxy(0, 0);
                         std::cout << "Waiting for game start." << std::endl
@@ -775,6 +830,11 @@ int main()
                     }
                     if (gameMode == '2')
                     { //be host
+                        win_control::goxy(0,0);
+                        std::cout << Game::References::EMPTYLINE << std::endl 
+                                  << Game::References::EMPTYLINE << std::endl 
+                                  << Game::References::EMPTYLINE << std::endl 
+                                  << Game::References::EMPTYLINE << std::endl;
                         Game::beHost();
                         win_control::goxy(0, 0);
                         std::cout << "Game started at IP : Help yourself." << std::endl;
@@ -875,8 +935,10 @@ int main()
     catch (...)
     {
         win_control::goxy(10, 0);
-        std::cout << "cy";
+        std::cout << "fuckccf";
     }
-    Game::Thread::joinAllThreads();
+    Game::Thread::joinServerThread();
+    Game::Thread::joinClientThreads();
+    Game::Network::io_context.stop();
     return 0;
 }
